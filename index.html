@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+    <meta charset="utf-8" />
+    
+    <!-- Small devices set viewscreen scale -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Title -->
+    <title>Meme Machine</title>
+    <meta name="title" content="Meme Machine" />
+
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/bootstrap-theme.min.css" rel="stylesheet">
+
+    <link href='http://fonts.googleapis.com/css?family=Crimson+Text:600,400italic' rel='stylesheet' type='text/css'>
+</head>
+<body id="content">
+    
+    <div class="container">
+        <div id="header" class="jumbotron">
+            <h1>Meme Machine</h1>
+            <h2>Create some bitchin' generic memes!</h2>
+        </div>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="panel panel-default">
+                    <div class="panel-heading">Create</div>
+                    <div class="panel-body">
+                        <form>
+                            <div class="form-group">
+                                <label for="file">Background image</label>
+                                <input type="file" id="file" />
+                            </div>
+                            <div class="form-group">
+                                <label for="text">Text</label>
+                                <textarea id="text" class="form-control"></textarea>
+                            </div>
+                            <div class="checkbox">
+                                <label>
+                                    <input id="hanging" type="checkbox" />
+                                    Baseline alignment?
+                                </label>
+                                <p class="help-block">Whether the user text should be on font baseline</p>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        Your Meme
+                        <a href="#" class="btn btn-success btn-xs pull-right" id="save" filename="file.png" target="_blank">
+                            Save <span class="glyphicon glyphicon-save"></span>
+                        </a>
+                    </div>
+                    <div class="panel-body">
+                        <canvas id="output" width="688"></canvas>
+                        <div class="alert alert-info" id="instruct1">Fill in the input to the left first!</div>
+                        <div class="alert alert-info" id="instruct2">Mouse over the image and drag the red markers to change text location</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/jquery-ui.min.js"></script>
+    <script src="//code.createjs.com/createjs-2013.09.25.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    
+    <!-- No script detection for CSS -->
+    <script>
+        $(document).ready(function() {
+            var offset_bottom = 0,
+                offset_baseline = -5,
+
+                save_button = $('#save'),
+                canvas = document.getElementById('output'),
+                stage = new createjs.Stage(canvas),
+                context = canvas.getContext('2d'),
+
+                el_image,
+
+                el_user = new createjs.Text(),
+                el_contain_user = new createjs.Container(),
+
+                el_our = new createjs.Text('#devlife'),
+                el_contain_our = new createjs.Container(),
+                el_move_our = move_handle_for(el_contain_our, el_user, false),
+
+                el_contain_all = new createjs.Container(),
+                el_move_all = move_handle_for(el_contain_all, stage, true)
+
+            function max(a, b) { return a > b ? a : b }
+            function min(a, b) { return a < b ? a : b }
+            function move_handle_gfx() {
+                var handle = new createjs.Shape()
+                handle.graphics.beginFill("#ff0000").drawRect(0, 0, 10, 10)
+                return handle
+            }
+            function update_canvas() {
+                stage.update()
+            }
+            function our_text_y() {
+                var bound = el_user.getBounds()
+                if (bound === null) return 0
+                return $('#hanging').is(':checked') ?
+                    bound.height + offset_baseline:
+                    bound.height + offset_bottom
+            }
+            function set_our_text_y() {
+                el_contain_our.y = our_text_y()
+                update_canvas()
+            }
+            function text_x(el, bound, try_x) {
+                var parent_bound = bound.getBounds(),
+                    our_bound = el.getBounds(),
+
+                    max_move = parent_bound.width - our_bound.width,
+
+                    max_x = bound.localToGlobal(bound.x + max_move, 0).x,
+                    min_x = bound.localToGlobal(bound.x, 0).x,
+                    rel_x
+
+                    if (typeof(try_x) === 'undefined') {
+                        try_x = el.localToGlobal(el.x, 0).x
+                    }
+
+                    rel_x = max(try_x, min_x)
+                    return max(min(rel_x, max_x), 0)
+            }
+            function set_text_x(el, bound, try_x) {
+                el.x = el.globalToLocal(text_x(el, bound, try_x), 0).x
+                update_canvas()
+            }
+            function move_handle_for(el, bound, move_y) {
+                var handle = move_handle_gfx()
+
+                handle.y = 0
+                handle.on('pressmove', function(ev) {
+                    set_text_x(el, bound, ev.stageX)
+
+                    if (move_y) {
+                        el.y = ev.stageY
+                    }
+                    update_canvas()
+                })
+
+                return handle
+            }
+            function move_handles_visible(vis) {
+                if (vis) {
+                    vis = 1
+                } else {
+                    vis = 0
+                }
+                el_move_all.alpha = vis
+                el_move_our.alpha = vis
+                update_canvas()
+            }
+
+            stage.addChild(el_contain_all)
+            el_contain_all.addChild(el_contain_user, el_contain_our, el_move_all)
+            el_contain_user.addChild(el_user)
+            el_contain_our.addChild(el_our, el_move_our)
+
+            el_user.y = 0
+            el_contain_user.y = 0
+            el_our.y = 0
+            el_contain_our.y = our_text_y()
+
+            el_user.font = '30px "Crimson Text"'
+            el_our.font = '14px "Crimson Text"'
+
+            move_handles_visible(false)
+
+            update_canvas()
+
+            // el_our.hitArea = hit_area(el_our)
+
+            $(canvas).hide()
+            $('#instruct2').hide()
+
+            $('#file').on('change', function(ev) {
+                var file = ev.target.files[0],
+                    reader = new FileReader()
+
+                $(reader).on('load', function(ev) {
+                    var new_height, bound
+
+                    if (el_image != null) {
+                        stage.removeChild(el_image)
+                    }
+
+                    el_image = new createjs.Bitmap(ev.target.result)
+
+                    stage.addChildAt(el_image, 0)
+
+                    // Resize image height
+                    bound = el_image.getBounds()
+                    ratio = canvas.width / bound.width
+
+                    // // Set heights, draw image
+                    el_image.setTransform(0, 0, ratio, ratio)
+                    canvas.height = bound.height * ratio
+
+                    // Toggle vis
+                    update_canvas()
+                    $(canvas).show()
+                    $('#instruct1').hide()
+                    $('#instruct2').show()
+                })
+                $('#text').on('keyup', function(ev) {
+                    el_user.text = $(ev.target).val()
+                    set_text_x(el_contain_our, el_user)
+                    set_our_text_y()
+                })
+                $('#hanging').on('change', set_our_text_y)
+
+                reader.readAsDataURL(file)
+            })
+            $(canvas).on('mouseover', function(ev) {
+                move_handles_visible(true)
+            })
+            $(canvas).on('mouseout', function(ev) {
+                move_handles_visible(false)
+            })
+            $('#save').on('mouseover', function(ev) {
+                $(ev.target).attr('href', canvas.toDataURL('image/png'))
+            })
+        })
+    </script>
+</body>
+</html>
